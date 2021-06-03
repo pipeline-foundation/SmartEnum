@@ -1,0 +1,183 @@
+name: CI/CD Pipeline
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  ci:
+    name: Continuous Integration
+    runs-on: windows-latest
+    outputs:
+      changes: ${{ steps.filter_changes.outputs.changes }}
+      smartenum: ${{ steps.filter_changes.outputs.smartenum }}
+      smartenum_autofixture: ${{ steps.filter_changes.outputs.autofixture }}
+      smartenum_jsonnet: ${{ steps.filter_changes.outputs.jsonnet }}
+      smartenum_messagepack: ${{ steps.filter_changes.outputs.messagepack }}
+      smartenum_protobufnet: ${{ steps.filter_changes.outputs.protobufnet}}
+      smartenum_systemtextjson: ${{ steps.filter_changes.outputs.systemtextjson }}
+      smartenum_utf8json: ${{ steps.filter_changes.outputs.utf8json }}
+    steps:
+      - name: Data gatherer
+        id: data_gatherer
+        shell: pwsh
+        run: |
+          # Get default branch
+          $repo = "${{ github.repository }}"
+          $defaultBranch = Invoke-RestMethod -Method GET -Uri https://api.github.com/repos/$repo | Select-Object -ExpandProperty default_branch
+          Write-Output "::set-output name=default_branch::$(echo $defaultBranch)"
+
+      - name: Conditionals handler
+        id: conditionals_handler
+        shell: pwsh
+        run: |
+          $defaultBranch = "${{ steps.data_gatherer.outputs.default_branch }}"
+          $githubRef = "${{ github.ref }}"
+          $githubEventName = "${{ github.event_name }}"
+          $isDefaultBranch = 'false'
+          $isPush = 'false'
+          $isPushToDefaultBranch = 'false'
+          if ( $githubRef -like "*$defaultBranch*" ) {
+            $isDefaultBranch = 'true'
+          }
+          if ( $githubEventName -eq 'push' ) {
+            $isPush = 'true'
+          }
+          if ( $githubRef -like "*$defaultBranch*" -and $githubEventName -eq 'push' ) {
+            $isPushToDefaultBranch = 'true'
+          }
+          Write-Output "::set-output name=is_default_branch::$(echo $isDefaultBranch)"
+          Write-Output "::set-output name=is_push::$(echo $isPush)"
+          Write-Output "::set-output name=is_push_to_default_branch::$(echo $isPushToDefaultBranch)"
+
+      - name: Setup .NET Core
+        id: setup_dotnet_core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 3.1.300
+
+      - name: Checkout repository
+        id: checkout_repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Filter changes
+        id: filter_changes
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            changes:
+              - 'src/**'
+            smartenum:
+              - 'src/SmartEnum/**'
+            autofixture:
+              - 'src/SmartEnum.AutoFixture/**'
+            jsonnet:
+              - 'src/SmartEnum.JsonNet/**'
+            messagepack:
+              - 'src/SmartEnum.MessagePack/**'
+            protobufnet:
+              - 'src/SmartEnum.ProtoBufNet/**'
+            systemtextjson:
+              - 'src/SmartEnum.SystemTextJson/**'
+            utf8json:
+              - 'src/SmartEnum.Utf8Json/**'
+
+      - if: steps.filter_changes.outputs.smartenum == 'true'
+        name: Build and test smartenum
+        id: build_and_test_smartenum
+        shell: pwsh
+        run: |
+          dotnet build .\src\SmartEnum\SmartEnum.csproj --configuration Release --output Artifacts
+          dotnet test .\src\SmartEnum\SmartEnum.csproj --configuration Release --no-build
+
+      - if: steps.filter_changes.outputs.autofixture == 'true'
+        name: Build and test autofixture
+        id: build_and_test_autofixture
+        shell: pwsh
+        run: |
+          dotnet build .\src\SmartEnum.AutoFixture\SmartEnum.AutoFixture.csproj --configuration Release --output Artifacts
+          dotnet test .\src\SmartEnum.AutoFixture\SmartEnum.AutoFixture.csproj --configuration Release --no-build
+
+      - if: steps.filter_changes.outputs.jsonnet == 'true'
+        name: Build and test jsonnet
+        id: build_and_test_jsonnet
+        shell: pwsh
+        run: |
+          dotnet build .\src\SmartEnum.JsonNet\SmartEnum.JsonNet.csproj --configuration Release --output Artifacts
+          dotnet test .\src\SmartEnum.JsonNet\SmartEnum.JsonNet.csproj --configuration Release --no-build
+
+      - if: steps.filter_changes.outputs.messagepack == 'true'
+        name: Build and test messagepack
+        id: build_and_test_messagepack
+        shell: pwsh
+        run: |
+          dotnet build .\src\SmartEnum.MessagePack\SmartEnum.MessagePack.csproj --configuration Release --output Artifacts
+          dotnet test .\src\SmartEnum.MessagePack\SmartEnum.MessagePack.csproj --configuration Release --no-build
+
+      - if: steps.filter_changes.outputs.protobufnet == 'true'
+        name: Build and test protobufnet
+        id: build_and_test_protobufnet
+        shell: pwsh
+        run: |
+          dotnet build .\src\SmartEnum.ProtoBufNet\SmartEnum.ProtoBufNet.csproj --configuration Release --output Artifacts
+          dotnet test .\src\SmartEnum.ProtoBufNet\SmartEnum.ProtoBufNet.csproj --configuration Release --no-build
+
+      - if: steps.filter_changes.outputs.systemtextjson == 'true'
+        name: Build and test systemtextjson
+        id: build_and_test_systemtextjson
+        shell: pwsh
+        run: |
+          dotnet build .\src\SmartEnum.SystemTextJson\SmartEnum.SystemTextJson.csproj --configuration Release --output Artifacts
+          dotnet test .\src\SmartEnum.SystemTextJson\SmartEnum.SystemTextJson.csproj --configuration Release --no-build
+
+      - if: steps.filter_changes.outputs.utf8json == 'true'
+        name: Build and test utf8json
+        id: build_and_test_utf8json
+        shell: pwsh
+        run: |
+          dotnet build .\src\SmartEnum.Utf8Json\SmartEnum.Utf8Json.csproj --configuration Release --output Artifacts
+          dotnet test .\src\SmartEnum.Utf8Json\SmartEnum.Utf8Json.csproj --configuration Release --no-build
+
+      - if: steps.filter_changes.outputs.changes == 'true'
+        name: Upload artifacts
+        id: upload_artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: NuGet Packages
+          path: Artifacts/
+
+
+  cd:
+    if: needs.ci.outputs.changes == 'true'
+    name: Continuous Deployment
+    needs: ci
+    runs-on: windows-latest
+    steps:
+      - name: Setup dotnet
+        id: setup_dotnet
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 3.1.300
+
+      - name: Checkout repository
+        id: checkout_repo
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Download and extract Artifacts
+        id: dl_artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: NuGet Packages
+          path: Artifacts/
+
+      # - name: Create and publish release
+      #   id: create_release
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     name: ${{ needs.ci.outputs.latest_version }}
+      #     tag_name: ${{ needs.ci.outputs.latest_version }}
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
