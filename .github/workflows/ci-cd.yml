@@ -7,7 +7,7 @@ jobs:
     name: Continuous Integration
     runs-on: windows-latest
     outputs:
-      is_changes: ${{ steps.filter_changes.outputs.changes }}
+      is_changes: ${{ steps.filter_changes.outputs.is_changes }}
       is_changes_in_smartenum: ${{ steps.filter_changes.outputs.is_changes_in_smartenum }}
     steps:
       - name: Data gatherer
@@ -191,29 +191,32 @@ jobs:
         id: determine_project_version
         shell: pwsh
         run: |
-          $latestGitVersion = (git tag --list 'SmartEnum-*' --sort=-committerdate)[0] -replace 'SmartEnum-v', ''
+          $latestGitVersion = [String]((git tag --list 'SmartEnum-*' --sort=-committerdate)[0]) -replace 'SmartEnum-v', ''
           $filePath = (Get-ChildItem .\src\SmartEnum\SmartEnum.csproj).FullName
-          $projectVersion = ([xml](Get-Content $filePath)).Project.PropertyGroup.Version)
+          $projectVersion = [String](([xml](Get-Content $filePath)).Project.PropertyGroup.Version) -replace '\s', ''
           $newVersion = ''
           $isNewTag = 'false'
-          $versionsList = $projectVersion, $latestGitVersion
+          $versionsList = ($projectVersion, $latestGitVersion)
 
           if ( $projectVersion -ne $latestGitVersion -and $projectVersion -eq ($versionsList | Sort { [Version] $_ } -Descending)[0] ) {
             $newVersion = $projectVersion
             $isNewTag = 'true'
             $smartEnumTag = "SmartEnum-v$newVersion"
-            git push origin "$isNewTag"
+
+            Write-Output "::set-output name=smartenum_tag::$(echo $smartEnumTag)"
+            Write-Output "::set-output name=new_version::$(echo $newVersion)"
           }
 
-          Write-Output "::set-output name=new_version::$(echo $newVersion)"
           Write-Output "::set-output name=is_new_tag::$(echo $isNewTag)"
 
       - if: steps.determine_project_version.outputs.is_new_tag == 'true'
         name: Create and publish release
         id: create_release
-        uses: softprops/action-gh-release@v1
-        with:
-          name: SmartEnum ${{ steps.determine_project_version.outputs.new_version }}
-          tag_name: SmartEnum-v${{ steps.determine_project_version.outputs.is_new_tag }}
+        shell: pwsh
+        run: |
+          $releaseTag = "${{ steps.determine_project_version.outputs.smartenum_tag }}"
+          $releaseTitle = "SmartEnum v${{ steps.determine_project_version.outputs.new_version }}"
+
+          gh release create $releaseTag --title $releaseTitle
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
