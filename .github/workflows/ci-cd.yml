@@ -122,16 +122,10 @@ jobs:
         id: upload_artifacts
         uses: actions/upload-artifact@v1
         with:
-          name: NuGet Packages
-          path: NuGet/
-
-      - if: steps.filter_changes.outputs.are_changes_in_any == 'true'
-        name: Upload artifacts from build
-        id: upload_artifacts_from_build
-        uses: actions/upload-artifact@v1
-        with:
-          name: BuildArtifacts
-          path: Artifacts/
+          name: Artifacts
+          path: |
+            NuGet/
+            Artifacts/
 
   cd:
     if: needs.ci.outputs.are_changes_in_any == 'true'
@@ -156,7 +150,7 @@ jobs:
         id: dl_artifact
         uses: actions/download-artifact@v2
         with:
-          name: NuGet Packages
+          name: Artifacts
           path: NuGet/
 
       - name: Publish to NuGet
