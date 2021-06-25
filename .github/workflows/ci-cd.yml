@@ -125,6 +125,14 @@ jobs:
           name: NuGet Packages
           path: NuGet/
 
+      - if: steps.filter_changes.outputs.are_changes_in_any == 'true'
+        name: Upload artifacts from build
+        id: upload_artifacts_from_build
+        uses: actions/upload-artifact@v1
+        with:
+          name: BuildArtifacts
+          path: Artifacts/
+
   cd:
     if: needs.ci.outputs.are_changes_in_any == 'true'
     name: Continuous Deployment
