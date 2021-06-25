@@ -134,6 +134,7 @@ jobs:
           name: Artifacts
           path: |
             Artifacts/
+
   cd:
     if: needs.ci.outputs.are_changes_in_any == 'true'
     name: Continuous Deployment
